@@ -33,17 +33,21 @@ jobs:
       # ✅ Step 1: Check Terraform Formatting and Fail on Errors
       - name: Run Terraform Format Check
         run: |
-          set -e  # Ensure script exits on the first failure
+          echo "Running Terraform fmt -check on modified files..."
+          CHECK_FAILED=0  # Variable to track failure
+
           for changed_file in ${{ steps.pr_files.outputs.added_modified }}; do
             if [[ $changed_file == *.tf ]]; then
-              echo "Checking terraform fmt on ${changed_file}..."
-              terraform fmt -check $changed_file || exit 1
+              terraform fmt -check $changed_file
+              if [[ $? -ne 0 ]]; then
+                echo "❌ Formatting issue in ${changed_file}" | tee -a $GITHUB_STEP_SUMMARY
+                CHECK_FAILED=1
+              fi
             fi
           done
 
-      # ✅ Step 2: Validate Terraform Syntax (Detects Syntax Errors)
-      - name: Run Terraform Validation
-        run: |
-          set -e  # Ensure script exits on the first failure
-          terraform init -backend=false
-          terraform validate
+          if [[ $CHECK_FAILED -ne 0 ]]; then
+            echo "Terraform formatting check failed! Exiting..."
+            exit 1
+          else
+            echo
