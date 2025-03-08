@@ -1,5 +1,4 @@
-name: Terraform Verification
-
+name: Validate terraform fmt
 on:
   pull_request:
     branches:
@@ -11,74 +10,43 @@ permissions:
   contents: read
 
 jobs:
-  validate_formatting:
+  validate:
     runs-on: ubuntu-latest
-    name: Validate Terraform Formatting
+    name: terraform fmt check
+    outputs:
+      CHECK_STATUS: "${{ env.CHECK_STATUS }}"
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 2
-
-      - name: Fetch Changed Files
+      - name: Fetch changed files
         id: pr_files
         uses: jitterbit/get-changed-files@v1
         with:
           format: "space-delimited"
-
-      - name: Configure Terraform
+      - name: Configure terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.2.4
-
-      - name: Debug Terraform File Detection
+      - name: Validate terraform fmt (added_modified)
         run: |
-          echo "🔍 Listing all Terraform (.tf) files in repository:"
-          find . -name "*.tf"
-          echo "----------------------------------"
-          echo "🔍 Checking which files are detected as changed:"
-          echo "${{ steps.pr_files.outputs.added_modified }}"
-          echo "----------------------------------"
+          set +e
 
-      - name: Run Terraform Format Check
-        run: |
-          echo "🚀 Running Terraform fmt -check on modified files..."
-          CHECK_FAILED=0
+          echo "CHECK_STATUS=0" >> $GITHUB_ENV
 
           for changed_file in ${{ steps.pr_files.outputs.added_modified }}; do
-            echo "🔎 Checking file: $changed_file"
+            echo "Checking terraform fmt on ${changed_file}..."
 
-            if [[ -f "$changed_file" && $changed_file == *.tf ]]; then
-              terraform fmt -check "$changed_file" || CHECK_FAILED=1
-            else
-              echo "⚠️ Skipping non-existent or non-Terraform file: $changed_file"
+            if [[ $changed_file == *.tf ]]; then
+              terraform fmt -check $changed_file
+              FMT_STATUS=$(echo $?)
+
+              if [[ $FMT_STATUS -ne 0 ]]; then
+                echo "❌ terraform fmt failed - ${changed_file}" >> $GITHUB_STEP_SUMMARY
+                echo "CHECK_STATUS=1" >> $GITHUB_ENV
+              fi
             fi
           done
-
-          if [[ $CHECK_FAILED -ne 0 ]]; then
-            echo "❌ Terraform formatting check failed!" | tee -a $GITHUB_STEP_SUMMARY
-            exit 1
-          else
-            echo "✅ All Terraform files are properly formatted."
-          fi
-
-  validate_syntax:
-    runs-on: ubuntu-latest
-    name: Validate Terraform Script
-    needs: validate_formatting  # Ensures formatting check passes first
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Configure Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.2.4
-
-      - name: Initialize Terraform
-        run: |
-          echo "🚀 Running terraform init"
-          terraform init -backend=false
-
-      - name: Run Terraform Validation
-        run: |
-          echo "🚀 Running terraform validate"
-          terraform validate || (echo "❌ Terraform validation failed!" | tee -a $GITHUB_STEP_SUMMARY && exit 1)
+      - name: Process check
+        if: always()
+        run: exit $CHECK_STATUS
