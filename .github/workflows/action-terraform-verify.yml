@@ -47,6 +47,18 @@ jobs:
               fi
             fi
           done
+
+      - name: Run Terraform Validation
+        run: |
+          set +e
+          terraform init -backend=false  # Initialize Terraform without backend (safe for PR validation)
+          terraform validate
+          VALIDATE_STATUS=$(echo $?)
+
+          if [[ $VALIDATE_STATUS -ne 0 ]]; then
+            echo "❌ terraform validate failed due to syntax errors!" >> $GITHUB_STEP_SUMMARY
+            echo "CHECK_STATUS=1" >> $GITHUB_ENV
+          fi
       - name: Process check
         if: always()
         run: exit $CHECK_STATUS
