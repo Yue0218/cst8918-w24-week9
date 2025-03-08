@@ -1,8 +1,9 @@
 # Define the resource group
 resource "azurerm_resource_group" "rg" {
-    name     = "${var.labelPrefix}-A09-RG"
-    location = var.region
+  name     = "${var.labelPrefix}-A09-RG"
+  location = var.region
 }
+
 
 # Define the storage account
 resource "azurerm_storage_account" "storage" {
