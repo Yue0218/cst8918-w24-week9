@@ -4,6 +4,7 @@ resource "azurerm_resource_group" "rg" {
   location = var.region
 }
 
+
 # Define the storage account
 resource "azurerm_storage_account" "storage" {
   name                     = "${var.labelPrefix}storageaccountlab"
